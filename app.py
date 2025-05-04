@@ -7,6 +7,7 @@ import os.path
 import pickle
 from telegram import Bot
 from dotenv import load_dotenv
+from aiohttp import web
 
 load_dotenv()
 
@@ -14,7 +15,6 @@ load_dotenv()
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 SCOPES = os.getenv('SCOPES').split(',')
-
 
 def get_calendar_service():
     creds = None
@@ -28,7 +28,6 @@ def get_calendar_service():
             pickle.dump(creds, token)
     return build('calendar', 'v3', credentials=creds)
 
-
 def get_today_events():
     service = get_calendar_service()
     now = datetime.utcnow()
@@ -40,11 +39,9 @@ def get_today_events():
     events = events_result.get('items', [])
     return events
 
-
 async def send_message(text):
     bot = Bot(token=TELEGRAM_TOKEN)
-    await bot.send_message(chat_id=CHAT_ID, text=text)
-
+    await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown')
 
 async def daily_job():
     events = get_today_events()
@@ -61,7 +58,6 @@ async def daily_job():
             message += f"• {event['summary']} at `{event_time}`\n"
         await send_message(message)
 
-
 async def wait_until_6_am():
     now = datetime.utcnow()
     next_6am = now.replace(hour=6, minute=0, second=0, microsecond=0)
@@ -70,12 +66,25 @@ async def wait_until_6_am():
     seconds_until_6am = (next_6am - now).total_seconds()
     await asyncio.sleep(seconds_until_6am)
 
-
 async def repeat_daily():
     while True:
         await wait_until_6_am()
         await daily_job()
 
+# Dummy web server to satisfy Render's port check
+async def handle(request):
+    return web.Response(text="Bot is running.")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv("PORT", 8080)))
+    await site.start()
+
+async def main():
+    await asyncio.gather(start_web_server(), repeat_daily())
 
 if __name__ == "__main__":
-    asyncio.run(repeat_daily())
+    asyncio.run(main())
