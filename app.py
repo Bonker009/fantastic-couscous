@@ -46,20 +46,36 @@ async def send_message(text):
     await bot.send_message(chat_id=CHAT_ID, text=text)
 
 
-def daily_job():
+async def daily_job():
     events = get_today_events()
     if not events:
-        message = "📅 You have no events today."
+        await send_message("You have no events today.")
     else:
-        message = "🔔 Your Schedule for Today:\n\n"
+        message = "🗓️ *Your schedule for today:*\n"
         for event in events:
             start = event['start'].get('dateTime', event['start'].get('date'))
-            parsed_time = parser.isoparse(start)
-            event_time = parsed_time.strftime('%I:%M %p') if 'dateTime' in event['start'] else start
-            message += f"• {event['summary']} at {event_time}\n"
-        message += "\nStay organized and have a productive day! 💼"
+            try:
+                event_time = datetime.fromisoformat(start.replace("Z", "+00:00")).strftime('%I:%M %p')
+            except:
+                event_time = start
+            message += f"• {event['summary']} at `{event_time}`\n"
+        await send_message(message)
 
-    asyncio.run(send_message(message))
+
+async def wait_until_6_am():
+    now = datetime.utcnow()
+    next_6am = now.replace(hour=6, minute=0, second=0, microsecond=0)
+    if now >= next_6am:
+        next_6am += timedelta(days=1)
+    seconds_until_6am = (next_6am - now).total_seconds()
+    await asyncio.sleep(seconds_until_6am)
 
 
-daily_job()
+async def repeat_daily():
+    while True:
+        await wait_until_6_am()
+        await daily_job()
+
+
+if __name__ == "__main__":
+    asyncio.run(repeat_daily())
