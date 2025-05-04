@@ -74,7 +74,7 @@ async def wait_until_6_am():
     now = datetime.now(local_tz)  # Local time
 
 
-    next_time = now.replace(hour=11, minute=40, second=0, microsecond=0)
+    next_time = now.replace(hour=6, minute=0, second=0, microsecond=0)
     print('Next time:', next_time)
 
     if now >= next_time:
