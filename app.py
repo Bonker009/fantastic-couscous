@@ -1,20 +1,22 @@
 import asyncio
-from dateutil import parser
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from datetime import datetime, timedelta
+import logging
 import os.path
 import pickle
-from telegram import Bot
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
+
+import pytz
 from aiohttp import web
+from dotenv import load_dotenv
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from telegram import Bot
 
 load_dotenv()
-
-# Access environment variables
+logging.basicConfig(level=logging.INFO)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 SCOPES = os.getenv('SCOPES').split(',')
+
 
 def get_calendar_service():
     creds = None
@@ -28,6 +30,7 @@ def get_calendar_service():
             pickle.dump(creds, token)
     return build('calendar', 'v3', credentials=creds)
 
+
 def get_today_events():
     service = get_calendar_service()
     now = datetime.utcnow()
@@ -39,11 +42,14 @@ def get_today_events():
     events = events_result.get('items', [])
     return events
 
+
 async def send_message(text):
     bot = Bot(token=TELEGRAM_TOKEN)
     await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown')
 
+
 async def daily_job():
+    print('Starting daily job')
     events = get_today_events()
     if not events:
         await send_message("You have no events today.")
@@ -56,24 +62,42 @@ async def daily_job():
             except:
                 event_time = start
             message += f"• {event['summary']} at `{event_time}`\n"
+        print(message)
+
         await send_message(message)
 
+
 async def wait_until_6_am():
-    now = datetime.utcnow()
-    next_6am = now.replace(hour=6, minute=0, second=0, microsecond=0)
-    if now >= next_6am:
-        next_6am += timedelta(days=1)
-    seconds_until_6am = (next_6am - now).total_seconds()
-    await asyncio.sleep(seconds_until_6am)
+    print('Waiting until 6:00 AM')
+
+    local_tz = pytz.timezone("Asia/Phnom_Penh")  # Adjust as needed
+    now = datetime.now(local_tz)  # Local time
+
+
+    next_time = now.replace(hour=11, minute=40, second=0, microsecond=0)
+    print('Next time:', next_time)
+
+    if now >= next_time:
+        next_time += timedelta(days=1)
+        print("now >= next_time, adjusting to the next day:", next_time)
+
+    print("now >= next_time check:", now, next_time)
+
+    seconds_until_target = (next_time - now).total_seconds()
+    logging.info(f"Seconds until target: {seconds_until_target}")
+
+    await asyncio.sleep(seconds_until_target)
+
 
 async def repeat_daily():
     while True:
         await wait_until_6_am()
         await daily_job()
 
-# Dummy web server to satisfy Render's port check
+
 async def handle(request):
     return web.Response(text="Bot is running.")
+
 
 async def start_web_server():
     app = web.Application()
@@ -83,8 +107,12 @@ async def start_web_server():
     site = web.TCPSite(runner, '0.0.0.0', int(os.getenv("PORT", 8080)))
     await site.start()
 
+
 async def main():
     await asyncio.gather(start_web_server(), repeat_daily())
 
+
 if __name__ == "__main__":
+    print("Application started.")
+
     asyncio.run(main())
