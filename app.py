@@ -6,11 +6,14 @@ from datetime import datetime, timedelta
 import os.path
 import pickle
 from telegram import Bot
+from dotenv import load_dotenv
 
-TELEGRAM_TOKEN = '7744112885:AAHmo3Q5_kRzkOjotVBc6GkcvarVZxpzII8'
-CHAT_ID = '1144386354'
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+load_dotenv()
 
+# Access environment variables
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
+SCOPES = os.getenv('SCOPES').split(',')
 
 
 def get_calendar_service():
